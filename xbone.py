@@ -1,18 +1,26 @@
 #XBONE PY by Griffin Brown
 #This software is released under the MIT license. Use it however you want.
- 
-import os
-import platform
+#
+#SETTINGS - EDIT THESE TO CONFIGURE XBONE PY
+#
+sendType = "UDP"                #Types UDP, TCP (NOT IMPLEMENTED), SERIAL (NOT IMPLEMENTED)
+sendAddress = "10.0.0.255"      #Address to send processed controller data to
+sendComplement = "5001"         #Complement (port or baud rate) of the sending address
+sendRate = 2                    #Rate to send data at in Hz
 
-#Get the current OS so we can import the right things and use proper logic depending on OS
-currentOS = platform.system()
+import threading
+import time
+from inputs import devices, get_gamepad
+
+if sendType == "UDP" or sendType == "TCP":
+    import socket
 
 #Check if device found and/or device connected
 bDeviceFound = False
 bDeviceConnected = False
 
 #Seconds of no events from device to consider a disconnect
-timeoutSeconds = 30
+timeoutSeconds = 5
 timeoutSecondsLeft = 0
 
 #Values of analog inputs and button inputs
@@ -25,13 +33,52 @@ vBtnFace = [0, 0, 0, 0] #Face buttons in order of [A, B, X, Y]
 vBtnFront = [0, 0] #Front buttons in order of [Start, Select]. On the controller Start and Select are the left and right buttons respectively.
 vBtnTr = [0, 0] #Trigger buttons in order of [Left Trigger, Right Trigger]
 
-#Check OS and import the proper prerequisites
-if currentOS == "Windows":
-    from inputs import devices, get_gamepad, DeviceManager
-    print("Currently running Windows")
-else:
-    print("Operating System: " + str(currentOS) + " not supported. Now exiting!")
-    exit()
+def make_sendable(num):
+    val = (num).to_bytes(2, byteorder="big", signed=True)
+    return val
+
+#Create packet of data
+def createPacket():
+    pack = bytearray(18)
+
+    #Starting byte of 101
+    pack[0] = 0b01100101
+
+    av1 = make_sendable(vAnalogL[0])
+    pack[1] = av1[0]
+    pack[2] = av1[1]
+
+    av2 = make_sendable(vAnalogL[1])
+    pack[3] = av2[0]
+    pack[4] = av2[1]
+
+    av3 = make_sendable(vAnalogR[0])
+    pack[5] = av3[0]
+    pack[6] = av3[1]
+
+    av4 = make_sendable(vAnalogR[1])
+    pack[7] = av4[0]
+    pack[8] = av4[1]
+
+    av5 = make_sendable(vAnalogD[0])
+    pack[9] = av5[0]
+    pack[10] = av5[1]
+
+    av6 = make_sendable(vAnalogD[1])
+    pack[11] = av6[0]
+    pack[12] = av6[1]
+
+    av7 = make_sendable(vAnalogZ[0])
+    pack[13] = av7[0]
+    pack[14] = av7[1]
+
+    av8 = make_sendable(vAnalogZ[1])
+    pack[15] = av8[0]
+    pack[16] = av8[1]
+
+    #Closing byte of 201
+    pack[17] = 0b11001001
+    return pack
 
 #Find a proper device from a list of found devices
 def findDevice():
@@ -96,17 +143,42 @@ def readButtons(event):
     except:
         pass
 
-#Try to make sure we have a device before continuing to main loop
-findDevice()
+class readThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
 
-while True:
-    try:
-        event = get_gamepad()[0]
-    except:
-        pass
+    def run(self):     
+        while True:
+            try:
+                event = get_gamepad()[0]
+            except:
+                pass
 
-    if event is not None:
-        if event.ev_type == "Absolute":
-            readAnalogs(event)
-        if event.ev_type == "Key":
-            readButtons(event)
+            if event is not None:
+                if event.ev_type == "Absolute":
+                    readAnalogs(event)
+                if event.ev_type == "Key":
+                    readButtons(event)
+
+class sendUDP(threading.Thread):
+    def __init__(self, address, complement, rate):
+        threading.Thread.__init__(self)
+        self.address = address
+        self.complement = complement
+        self.rate = rate
+
+        #Create UDP socket
+        self.UDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.UDP.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    def run(self):     
+        while True:
+            self.UDP.sendto(createPacket(), (self.address, int(self.complement)))
+            time.sleep(1 / self.rate)
+
+rThread = readThread()
+rThread.start()
+
+if sendType == "UDP":
+    sThread = sendUDP(sendAddress, sendComplement, sendRate)
+    sThread.start()
