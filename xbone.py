@@ -39,7 +39,7 @@ def make_sendable(num):
 
 #Create packet of data
 def createPacket():
-    pack = bytearray(18)
+    pack = bytearray(19)
 
     #Starting byte of 101
     pack[0] = 0b01100101
@@ -76,8 +76,21 @@ def createPacket():
     pack[15] = av8[0]
     pack[16] = av8[1]
 
+    #Buttons
+    #This works by setting bits within the byte, each of 8 buttons corresponding to 1 of 8 bits
+    bbyte = 0
+    bbyte = bbyte + vBtnFace[0]  * 0b00000001
+    bbyte = bbyte + vBtnFace[1]  * 0b00000010
+    bbyte = bbyte + vBtnFace[2]  * 0b00000100
+    bbyte = bbyte + vBtnFace[3]  * 0b00001000
+    bbyte = bbyte + vBtnTr[0]    * 0b00010000
+    bbyte = bbyte + vBtnTr[1]    * 0b00100000
+    bbyte = bbyte + vBtnFront[0] * 0b01000000
+    bbyte = bbyte + vBtnFront[1] * 0b10000000
+    pack[17] = bbyte
+
     #Closing byte of 201
-    pack[17] = 0b11001001
+    pack[18] = 0b11001001
     return pack
 
 #Find a proper device from a list of found devices
