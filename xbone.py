@@ -4,7 +4,7 @@
 #SETTINGS - EDIT THESE TO CONFIGURE XBONE PY
 #
 sendType = "UDP"                #Types UDP, TCP (NOT IMPLEMENTED), SERIAL (NOT IMPLEMENTED)
-sendAddress = "10.0.0.255"      #Address to send processed controller data to
+sendAddress = "127.0.0.1"       #Address to send processed controller data to
 sendComplement = "5001"         #Complement (port or baud rate) of the sending address
 sendRate = 2                    #Rate to send data at in Hz
 
@@ -14,6 +14,11 @@ from inputs import devices, get_gamepad
 
 if sendType == "UDP" or sendType == "TCP":
     import socket
+elif sendType == "Serial":
+    import serial
+else:
+    input("Unsupported sendType! Check settings at top of xbone.py!")
+    exit()
 
 #Check if device found and/or device connected
 bDeviceFound = False
@@ -189,9 +194,61 @@ class sendUDP(threading.Thread):
             self.UDP.sendto(createPacket(), (self.address, int(self.complement)))
             time.sleep(1 / self.rate)
 
+class sendTCP(threading.Thread):
+    def __init__(self, address, complement, rate):
+        threading.Thread.__init__(self)
+        self.address = address
+        self.complement = complement
+        self.rate = rate
+
+        print("TCP not yet supported, it is untested!")
+        
+        #Create UDP socket
+        #self.TCP = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+        #self.TCP.connect((self.address, int(self.complement)))
+
+    def run(self):     
+        while True:
+            print("TCP not yet supported, it is untested!")
+            #self.TCP.sendall(createPacket())
+            time.sleep(1 / self.rate)
+
+class sendSerial(threading.Thread):
+    def __init__(self, address, complement, rate):
+        threading.Thread.__init__(self)
+        self.address = address
+        self.complement = complement
+        self.rate = rate
+
+        #Create UDP socket
+        self.Ser = serial.Serial(
+            port = self.address,
+            baudrate = int(self.complement),
+            parity = serial.PARITY_NONE,
+            bytesize = serial.EIGHTBITS,
+            timeout = 1
+        )
+
+        if not self.Ser.is_open:
+            self.Ser.open()
+
+    def run(self):     
+        while True:
+            print("Serial not yet supported, it is untested!")
+            #self.Ser.write(createPacket())
+            time.sleep(1 / self.rate)
+
 rThread = readThread()
 rThread.start()
 
 if sendType == "UDP":
     sThread = sendUDP(sendAddress, sendComplement, sendRate)
+    sThread.start()
+
+if sendType == "TCP":
+    sThread = sendTCP(sendAddress, sendComplement, sendRate)
+    sThread.start()
+
+if sendType == "Serial":
+    sThread = sendSerial(sendAddress, sendComplement, sendRate)
     sThread.start()
